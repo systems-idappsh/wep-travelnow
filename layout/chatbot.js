@@ -1,623 +1,1168 @@
-// FILE: layout/chatbot.js
-// Travel Now Chatbot contextual híbrido.
-// - Inserta HTML del chatbot automáticamente.
-// - Saluda según hora local.
-// - Mantiene visitante, nombre, historial y contexto en localStorage.
-// - Usa "Info. página actual" con flujo predeterminado.
-// - Usa IA solo para pregunta directa o preguntas libres.
-// - No contiene API keys.
-
-(() => {
+/* =========================================================
+   /layout/chatbot.js — Travel Now Chatbot IA v2.4
+   Corrección quirúrgica:
+   - Historial real persistido en TRAVEL_NOW_CHAT_HISTORY
+   - Extractor de nombre seguro con blocklist para patrón "soy X"
+   - Mantiene endpoint, IDs idappsh-chat-* y compatibilidad CSS actual
+   - Corrige capas/posición vía JS para que header/nav no tape chat, soporte ni modal
+   - Envía page_context real: título, encabezados, texto visible y links internos
+   - No repite saludo si ya saludó durante la sesión de navegación
+========================================================= */
+(function () {
   "use strict";
 
-  if (window.__TRAVEL_NOW_CONTEXTUAL_CHATBOT_INIT__) return;
-  window.__TRAVEL_NOW_CONTEXTUAL_CHATBOT_INIT__ = true;
+  if (window.__TN_CHATBOT_INIT__) return;
 
-  const ENDPOINT = "https://travelnow-chatbot-ia.systems-idappsh.workers.dev/chat";
-  const WHATSAPP_URL = "https://wa.me/5215521114448";
-  const MAX_INPUT_CHARS = 420;
-  const MAX_RENDERED_REPLY_CHARS = 700;
-  const MAX_HISTORY_ITEMS = 12;
+  window.__TN_CHATBOT_INIT__ = true;
+  window.__TRAVEL_NOW_CHATBOT_INIT__ = true;
+  window.__IDAPPSH_CHATBOT_INIT__ = true;
 
-  const STORAGE = Object.freeze({
-    visitorId: "TRAVEL_NOW_VISITOR_ID",
-    visitorName: "TRAVEL_NOW_VISITOR_NAME",
-    sessionId: "TRAVEL_NOW_CHAT_SESSION_ID",
-    context: "TRAVEL_NOW_CHAT_CONTEXT",
-    history: "TRAVEL_NOW_CHAT_HISTORY",
-    lastPage: "TRAVEL_NOW_LAST_PAGE",
-    lastIntent: "TRAVEL_NOW_LAST_INTENT",
-    booted: "TRAVEL_NOW_CHAT_BOOTED"
-  });
+  /* -------------------------------------------------------
+     Constantes
+  ------------------------------------------------------- */
+  var WORKER_URL = "https://travelnow-chatbot-ia.systems-idappsh.workers.dev/chat";
+  var WHATSAPP_URL = "https://wa.me/5215521114448";
+  var CHATBOT_CSS = "/assets/css/layout/chatbot.css";
+  var CHATBOT_ICON = "/assets/img/mp4/flotante1.webp";
+  var MAX_REPLY_CHARS = 520;
+  var MAX_HISTORY_ITEMS = 12;
+  var MAX_HISTORY_CHARS = 900;
 
-  const PAGE_MAP = [
-    {
-      key: "visas_americanas",
-      label: "Visas Americanas",
-      test: (path) => path.includes("/pages/tramites/visas-americanas") || path.includes("/pages/visaspais/visa-estados-unidos"),
-      questions: [
-        { label: "Requisitos", send: "Quiero requisitos generales para visa americana" },
-        { label: "DS-160", send: "Necesito ayuda con el DS-160" },
-        { label: "Primera vez", send: "Voy a tramitar visa americana por primera vez" },
-        { label: "Renovación", send: "Quiero renovar mi visa americana" },
-        { label: "Entrevista", send: "Cómo prepararme para entrevista consular" },
-        { label: "Asesoría", send: "Quiero agendar asesoría para visa americana" }
-      ]
-    },
-    {
-      key: "pasaportes",
-      label: "Pasaportes",
-      test: (path) => path.includes("/pages/tramites/pasaportes"),
-      questions: [
-        { label: "Primera vez", send: "Quiero información de pasaporte por primera vez" },
-        { label: "Renovación", send: "Quiero renovar mi pasaporte" },
-        { label: "Menores", send: "Quiero información de pasaporte para menor de edad" },
-        { label: "Reposición", send: "Necesito reposición de pasaporte" },
-        { label: "Citas", send: "Quiero información sobre citas de pasaporte" },
-        { label: "Asesoría", send: "Quiero asesoría para pasaporte" }
-      ]
-    },
-    {
-      key: "agendado_citas",
-      label: "Agendado de Citas",
-      test: (path) => path.includes("/pages/tramites/agendado-citas"),
-      questions: [
-        { label: "Cómo funciona", send: "Cómo funciona el agendado de citas" },
-        { label: "Cita CAS", send: "Quiero información sobre cita CAS" },
-        { label: "Consulado", send: "Quiero información sobre cita en consulado" },
-        { label: "Reprogramar", send: "Quiero reprogramar una cita" },
-        { label: "Adelanto", send: "Quiero revisar adelanto de cita" },
-        { label: "WhatsApp", url: WHATSAPP_URL }
-      ]
-    },
-    {
-      key: "asesoria",
-      label: "Asesoría Personalizada",
-      test: (path) => path.includes("/pages/tramites/asesoria-personalizada"),
-      questions: [
-        { label: "Qué incluye", send: "Qué incluye la asesoría personalizada" },
-        { label: "DS-160", send: "Necesito ayuda con DS-160" },
-        { label: "Revisión", send: "Quiero revisión de mi caso" },
-        { label: "Entrevista", send: "Quiero preparación para entrevista" },
-        { label: "Costo", send: "Quiero saber costo de asesoría" },
-        { label: "WhatsApp", url: WHATSAPP_URL }
-      ]
-    },
-    {
-      key: "servicios",
-      label: "Servicios",
-      test: (path) => path.includes("/pages/core/servicios") || path === "/" || path.endsWith("/index.html"),
-      questions: [
-        { label: "Visas americanas", send: "Quiero información sobre visas americanas" },
-        { label: "Pasaportes", send: "Quiero información sobre pasaportes" },
-        { label: "Agendado citas", send: "Quiero información sobre agendado de citas" },
-        { label: "Asesoría", send: "Quiero una asesoría personalizada" },
-        { label: "Visas por país", send: "Quiero información sobre visas por país" },
-        { label: "WhatsApp", url: WHATSAPP_URL }
-      ]
-    },
-    {
-      key: "visaspais",
-      label: "Visas por País",
-      test: (path) => path.includes("/pages/visaspais/"),
-      questions: [
-        { label: "Requisitos", send: "Quiero requisitos de esta visa por país" },
-        { label: "Tiempo proceso", send: "Cuánto tarda este trámite de visa" },
-        { label: "Documentos", send: "Qué documentos necesito para esta visa" },
-        { label: "Costo", send: "Quiero saber costo de este trámite" },
-        { label: "Asesoría", send: "Quiero asesoría para esta visa" },
-        { label: "WhatsApp", url: WHATSAPP_URL }
-      ]
-    },
-    {
-      key: "faq",
-      label: "Preguntas Frecuentes",
-      test: (path) => path.includes("/pages/core/faq"),
-      questions: [
-        { label: "Visas", send: "Preguntas frecuentes sobre visas" },
-        { label: "Pasaportes", send: "Preguntas frecuentes sobre pasaportes" },
-        { label: "Citas", send: "Preguntas frecuentes sobre citas" },
-        { label: "Costos", send: "Preguntas frecuentes sobre costos" },
-        { label: "Contacto", send: "Quiero contactar a Travel Now" }
-      ]
-    },
-    {
-      key: "contacto",
-      label: "Contacto",
-      test: (path) => path.includes("/pages/core/contacto"),
-      questions: [
-        { label: "WhatsApp", url: WHATSAPP_URL },
-        { label: "Correo", url: "mailto:contacto@travel-now.com.mx" },
-        { label: "Servicios", url: "https://travel-now.com.mx/pages/core/servicios.html" },
-        { label: "Asesoría", send: "Quiero una asesoría personalizada" },
-        { label: "Visa americana", send: "Quiero información sobre visa americana" }
-      ]
-    }
+  // Capas controladas por JS para evitar que header/nav tape asistentes o modales.
+  var LAYER_Z = {
+    header: 1000,
+    supportFab: 12000,
+    supportOverlay: 12500,
+    supportPanel: 12600,
+    assistantOverlay: 13000,
+    assistantModal: 13100,
+    chatLauncher: 14000,
+    chatPanel: 14100
+  };
+
+  var SESSION_KEY = "TRAVEL_NOW_CHAT_SESSION_ID";
+  var CONTEXT_KEY = "TRAVEL_NOW_CHAT_CONTEXT";
+  var VISITOR_ID_KEY = "TRAVEL_NOW_VISITOR_ID";
+  var VISITOR_NAME_KEY = "TRAVEL_NOW_VISITOR_NAME";
+  var LAST_PAGE_KEY = "TRAVEL_NOW_LAST_PAGE";
+  var LAST_INTENT_KEY = "TRAVEL_NOW_LAST_INTENT";
+  var HISTORY_KEY = "TRAVEL_NOW_CHAT_HISTORY";
+  var GREETING_SHOWN_KEY = "TRAVEL_NOW_GREETING_SHOWN";
+
+  var SOY_BLOCKLIST = [
+    "estudiante", "mexicano", "mexicana", "menor", "cliente", "usuario",
+    "asesor", "asesora", "turista", "adulto", "adulta", "mayor", "persona",
+    "solicitante", "de", "del", "la", "el", "un", "una", "nuevo", "nueva",
+    "interesado", "interesada", "extranjero", "extranjera", "mexico", "méxico",
+    "cdmx", "guadalajara", "monterrey", "tijuana", "hombre", "mujer"
   ];
 
-  function safeString(value, max = 1000) {
-    return typeof value === "string" ? value.trim().slice(0, max) : "";
+  /* -------------------------------------------------------
+     Utilidades generales
+  ------------------------------------------------------- */
+  function onReady(callback) {
+    if (typeof callback !== "function") return;
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback, { once: true });
+      return;
+    }
+    callback();
+  }
+
+  function safeText(value, maxLength) {
+    var limit = Number.isFinite(Number(maxLength)) ? Number(maxLength) : 2000;
+    if (typeof value !== "string") return "";
+    return value.trim().slice(0, limit);
+  }
+
+  function normalizePlainText(value) {
+    return safeText(value, 120)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  }
+
+  function capitalizeName(value) {
+    var name = safeText(value, 60).replace(/\s+/g, " ");
+    if (!name) return "";
+
+    return name
+      .split(" ")
+      .filter(Boolean)
+      .map(function (part) {
+        return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+      })
+      .join(" ");
   }
 
   function makeId() {
-    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
-      return globalThis.crypto.randomUUID();
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
     }
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return String(Date.now()) + "-" + Math.random().toString(16).slice(2);
   }
 
-  function getStorage(key, fallback = "") {
-    try {
-      return localStorage.getItem(key) || fallback;
-    } catch {
-      return fallback;
-    }
-  }
-
-  function setStorage(key, value) {
-    try {
-      localStorage.setItem(key, String(value));
-    } catch {}
-  }
-
-  function parseJson(value, fallback) {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return fallback;
-    }
-  }
-
-  function getHourGreeting() {
-    const hour = new Date().getHours();
+  /* -------------------------------------------------------
+     Saludo por hora local
+  ------------------------------------------------------- */
+  function getTimeGreeting() {
+    var hour = new Date().getHours();
     if (hour >= 5 && hour < 12) return "Buenos días";
     if (hour >= 12 && hour < 19) return "Buenas tardes";
     return "Buenas noches";
   }
 
-  function getCurrentPageInfo() {
-    const url = new URL(window.location.href);
-    const path = url.pathname || "/";
-    const normalizedPath = path === "" ? "/" : path;
-
-    const match = PAGE_MAP.find((page) => {
-      try {
-        return page.test(normalizedPath);
-      } catch {
-        return false;
-      }
-    });
-
-    return match || PAGE_MAP.find((page) => page.key === "servicios");
+  /* -------------------------------------------------------
+     Helpers localStorage tolerantes a fallo
+  ------------------------------------------------------- */
+  function lsGet(key) {
+    try { return localStorage.getItem(key) || ""; } catch (error) { return ""; }
   }
 
-  function clipForBubble(text, max = MAX_RENDERED_REPLY_CHARS) {
-    const raw = safeString(text, max + 120);
-    if (raw.length <= max) return raw;
+  function lsSet(key, value) {
+    try { localStorage.setItem(key, String(value)); } catch (error) { /* noop */ }
+  }
 
-    const clipped = raw.slice(0, max).trim();
-    const sentenceEnd = Math.max(
-      clipped.lastIndexOf("."),
-      clipped.lastIndexOf("?"),
-      clipped.lastIndexOf("!")
-    );
+  function lsRemove(key) {
+    try { localStorage.removeItem(key); } catch (error) { /* noop */ }
+  }
 
-    if (sentenceEnd > Math.floor(max * 0.65)) {
-      return `${clipped.slice(0, sentenceEnd + 1).trim()}`;
+  function ssGet(key) {
+    try { return sessionStorage.getItem(key) || ""; } catch (error) { return ""; }
+  }
+
+  function ssSet(key, value) {
+    try { sessionStorage.setItem(key, String(value)); } catch (error) { /* noop */ }
+  }
+
+  function hasGreetedThisSession() {
+    return ssGet(GREETING_SHOWN_KEY) === "1";
+  }
+
+  function markGreetedThisSession() {
+    ssSet(GREETING_SHOWN_KEY, "1");
+  }
+
+  function getVisitorId() {
+    var id = lsGet(VISITOR_ID_KEY);
+    if (id) return id;
+    id = makeId();
+    lsSet(VISITOR_ID_KEY, id);
+    return id;
+  }
+
+  function getVisitorName() { return lsGet(VISITOR_NAME_KEY); }
+  function setVisitorName(name) { lsSet(VISITOR_NAME_KEY, safeText(name, 60)); }
+  function getLastPage() { return lsGet(LAST_PAGE_KEY); }
+  function setLastPage(path) { lsSet(LAST_PAGE_KEY, safeText(path, 300)); }
+  function setLastIntent(intent) { lsSet(LAST_INTENT_KEY, safeText(intent, 120)); }
+
+  function parseStoredContext() { return lsGet(CONTEXT_KEY) || "inicio"; }
+  function setStoredContext(ctx) { lsSet(CONTEXT_KEY, safeText(ctx, 80) || "inicio"); }
+
+  function parseSessionId() {
+    var id = lsGet(SESSION_KEY);
+    if (id) return id;
+    id = makeId();
+    lsSet(SESSION_KEY, id);
+    return id;
+  }
+
+  /* -------------------------------------------------------
+     Historial persistente real
+  ------------------------------------------------------- */
+  function normalizeHistoryItem(item) {
+    if (!item || typeof item !== "object") return null;
+
+    var role = item.role === "assistant" ? "assistant" : item.role === "user" ? "user" : "";
+    var content = safeText(item.content, MAX_HISTORY_CHARS);
+
+    if (!role || !content) return null;
+
+    return {
+      role: role,
+      content: content
+    };
+  }
+
+  function loadStoredHistory() {
+    var raw = lsGet(HISTORY_KEY);
+    var parsed;
+
+    if (!raw) return [];
+
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      lsRemove(HISTORY_KEY);
+      return [];
     }
 
-    return `${clipped.replace(/[,\s]+$/g, "")}…`;
+    if (!Array.isArray(parsed)) {
+      lsRemove(HISTORY_KEY);
+      return [];
+    }
+
+    return parsed
+      .map(normalizeHistoryItem)
+      .filter(Boolean)
+      .slice(-MAX_HISTORY_ITEMS);
   }
 
-  function detectName(text) {
-    const clean = safeString(text, 160);
-    if (!clean) return "";
+  function saveStoredHistory(historyList) {
+    var normalized = Array.isArray(historyList)
+      ? historyList.map(normalizeHistoryItem).filter(Boolean).slice(-MAX_HISTORY_ITEMS)
+      : [];
 
-    const patterns = [
-      /\bme llamo\s+([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+){0,2})/i,
-      /\bmi nombre es\s+([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+){0,2})/i,
-      /\bsoy\s+([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+){0,2})/i
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
+    } catch (error) {
+      /* Si localStorage falla o está lleno, no rompemos el chat. */
+    }
+
+    return normalized;
+  }
+
+  /* -------------------------------------------------------
+     Extracción segura de nombre
+  ------------------------------------------------------- */
+  function isBlockedNameCandidate(candidate, sourceType) {
+    var normalized = normalizePlainText(candidate);
+    var firstWord = normalized.split(/\s+/)[0] || "";
+
+    if (!normalized || normalized.length < 2) return true;
+    if (SOY_BLOCKLIST.indexOf(normalized) >= 0) return true;
+    if (SOY_BLOCKLIST.indexOf(firstWord) >= 0) return true;
+
+    // Para "soy X" somos más estrictos porque suele expresar condición, no nombre.
+    if (sourceType === "soy" && normalized.indexOf(" ") >= 0) return true;
+
+    return false;
+  }
+
+  function extractName(text) {
+    var source = safeText(text, 300);
+    var patterns;
+    var found = null;
+
+    if (!source) return null;
+
+    patterns = [
+      { type: "direct", re: /\bme\s+llamo\s+([A-Za-záéíóúüÁÉÍÓÚÜñÑ]{2,30}(?:\s+[A-Za-záéíóúüÁÉÍÓÚÜñÑ]{2,30})?)/i },
+      { type: "direct", re: /\bmi\s+nombre\s+es\s+([A-Za-záéíóúüÁÉÍÓÚÜñÑ]{2,30}(?:\s+[A-Za-záéíóúüÁÉÍÓÚÜñÑ]{2,30})?)/i },
+      { type: "soy", re: /\bsoy\s+([A-Za-záéíóúüÁÉÍÓÚÜñÑ]{2,30})(?=\s*[,\.\n!?]|\s*$)/i }
     ];
 
-    for (const pattern of patterns) {
-      const match = clean.match(pattern);
-      if (match?.[1]) {
-        return match[1]
-          .trim()
-          .replace(/[^\p{L}\s]/gu, "")
-          .split(/\s+/)
-          .slice(0, 2)
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-          .join(" ");
+    patterns.some(function (item) {
+      var match = source.match(item.re);
+      var candidate;
+
+      if (!match || !match[1]) return false;
+
+      candidate = safeText(match[1], 60);
+      if (isBlockedNameCandidate(candidate, item.type)) return false;
+
+      found = capitalizeName(candidate);
+      return Boolean(found);
+    });
+
+    return found;
+  }
+
+  /* -------------------------------------------------------
+     Constructor del saludo inicial
+  ------------------------------------------------------- */
+  function buildGreeting() {
+    var saludo = getTimeGreeting();
+    var name = getVisitorName();
+    var lastPage = getLastPage();
+    var currentPath = window.location.pathname;
+
+    setLastPage(currentPath);
+
+    if (name && lastPage && lastPage !== currentPath) {
+      return saludo + ", " + name + " 👋\nSeguimos aquí. ¿En qué puedo ayudarte?";
+    }
+
+    if (name) {
+      return saludo + ", " + name + " 👋\nSoy el asistente de Travel Now. ¿En qué puedo ayudarte?";
+    }
+
+    return saludo + " 👋 Soy el asistente de Travel Now.\n¿En qué puedo ayudarte?";
+  }
+
+  /* -------------------------------------------------------
+     DOM — CSS y marcado del chatbot
+  ------------------------------------------------------- */
+  function ensureStylesheet(href) {
+    var cleanHref = safeText(href, 300);
+    var links;
+    var index;
+
+    if (!cleanHref) return;
+
+    links = document.querySelectorAll('link[rel="stylesheet"][href]');
+    for (index = 0; index < links.length; index += 1) {
+      try {
+        if (new URL(links[index].getAttribute("href"), document.baseURI).pathname === cleanHref) return;
+      } catch (error) {
+        if (links[index].getAttribute("href") === cleanHref) return;
       }
     }
 
-    return "";
+    var link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = cleanHref;
+    document.head.appendChild(link);
+  }
+
+  function createElement(tagName, options) {
+    var el = document.createElement(tagName);
+    var opts = options && typeof options === "object" ? options : {};
+    var key;
+
+    if (opts.id) el.id = opts.id;
+    if (opts.className) el.className = opts.className;
+    if (opts.text) el.textContent = opts.text;
+
+    if (opts.attrs && typeof opts.attrs === "object") {
+      for (key in opts.attrs) {
+        if (Object.prototype.hasOwnProperty.call(opts.attrs, key)) {
+          el.setAttribute(key, String(opts.attrs[key]));
+        }
+      }
+    }
+
+    return el;
+  }
+
+  function setLayer(selector, zIndex, position) {
+    var nodes = document.querySelectorAll(selector);
+
+    nodes.forEach(function (node) {
+      if (!node || !node.style) return;
+      if (position && !node.style.position) node.style.position = position;
+      node.style.zIndex = String(zIndex);
+    });
+  }
+
+  function applyLayerFix() {
+    // Header/nav: lo dejamos por debajo de asistentes flotantes.
+    setLayer(".header, .site-header", LAYER_Z.header, "");
+
+    // Soporte visual y formulario rápido. Estos elementos existen en HTML.
+    setLayer("#supportFab, .support-fab", LAYER_Z.supportFab, "fixed");
+    setLayer("#supportOverlay, .support-overlay", LAYER_Z.supportOverlay, "fixed");
+    setLayer("#supportPanel, .support-panel", LAYER_Z.supportPanel, "fixed");
+    setLayer("#assistantOverlay, .assistant-overlay", LAYER_Z.assistantOverlay, "fixed");
+    setLayer("#assistantModal", LAYER_Z.assistantModal, "fixed");
+
+    // Chatbot IA.
+    setLayer("#idappsh-chat-launcher", LAYER_Z.chatLauncher, "fixed");
+    setLayer("#idappsh-chat-panel", LAYER_Z.chatPanel, "fixed");
+  }
+
+  function getHeaderSafeTop() {
+    var header = document.querySelector(".header, .site-header");
+    var rect;
+    var computed;
+
+    if (!header) return 12;
+
+    rect = header.getBoundingClientRect();
+    computed = window.getComputedStyle ? window.getComputedStyle(header) : null;
+
+    if (!rect || rect.height <= 0) return 12;
+
+    if (
+      header.classList.contains("is-fixed") ||
+      header.classList.contains("scrolled") ||
+      (computed && (computed.position === "fixed" || computed.position === "sticky"))
+    ) {
+      return Math.max(12, Math.ceil(rect.bottom + 12));
+    }
+
+    return 12;
   }
 
   function ensureChatbotMarkup() {
-    if (document.getElementById("idappsh-chat-launcher")) return;
+    var existingLauncher = document.getElementById("idappsh-chat-launcher");
+    var existingPanel = document.getElementById("idappsh-chat-panel");
 
-    const launcher = document.createElement("button");
-    launcher.id = "idappsh-chat-launcher";
-    launcher.className = "travel-chat-launcher";
-    launcher.type = "button";
-    launcher.setAttribute("aria-label", "Abrir asistente Travel Now");
-    launcher.innerHTML = `
-      <span class="chatbot-icon" aria-hidden="true">✈️</span>
-      <span class="chatbot-pulse" aria-hidden="true"></span>
-    `;
+    if (existingLauncher && existingPanel) return;
 
-    const panel = document.createElement("section");
-    panel.id = "idappsh-chat-panel";
-    panel.className = "travel-chat-panel";
-    panel.setAttribute("aria-hidden", "true");
-    panel.innerHTML = `
-      <header class="chat-head">
-        <div class="chat-brand">
-          <strong>Travel Now Assistant</strong>
-          <span>Visas, pasaportes y asesoría</span>
-        </div>
-        <button id="idappsh-chat-close" class="chat-close" type="button" aria-label="Cerrar chat">×</button>
-      </header>
+    if (existingLauncher) existingLauncher.remove();
+    if (existingPanel) existingPanel.remove();
 
-      <div id="idappsh-chat-messages" class="chat-messages" aria-live="polite"></div>
+    var launcher = createElement("button", {
+      id: "idappsh-chat-launcher",
+      attrs: { type: "button", "aria-label": "Abrir chat de Travel Now", "aria-expanded": "false" }
+    });
 
-      <form id="idappsh-chat-form" class="chat-form">
-        <input
-          id="idappsh-chat-input"
-          type="text"
-          maxlength="${MAX_INPUT_CHARS}"
-          placeholder="Escribe tu duda..."
-          autocomplete="off"
-        />
-        <button id="idappsh-chat-send" type="submit" aria-label="Enviar">Enviar</button>
-      </form>
-    `;
+    var icon = createElement("img", {
+      className: "chatbot-gif-icon",
+      attrs: {
+        src: CHATBOT_ICON,
+        alt: "Travel Now Assistant",
+        loading: "eager",
+        decoding: "async",
+        width: "92",
+        height: "192"
+      }
+    });
+
+    var fallbackIcon = createElement("i", {
+      className: "fa-solid fa-comments",
+      attrs: { "aria-hidden": "true" }
+    });
+
+    icon.addEventListener("error", function () {
+      icon.remove();
+      if (!launcher.contains(fallbackIcon)) launcher.appendChild(fallbackIcon);
+    });
+
+    launcher.appendChild(icon);
+
+    var panel = createElement("section", {
+      id: "idappsh-chat-panel",
+      attrs: { "aria-hidden": "true", "aria-label": "Chat de Travel Now" }
+    });
+
+    var head = createElement("div", { className: "chat-head" });
+    var title = createElement("div", { className: "chat-title" });
+    var name = createElement("div", { className: "chat-name", text: "Travel Now Assistant" });
+    var sub = createElement("div", { className: "chat-sub", text: "Visas, pasaportes y asesoría" });
+    var close = createElement("button", {
+      id: "idappsh-chat-close",
+      className: "chat-close",
+      text: "×",
+      attrs: { type: "button", "aria-label": "Cerrar chat" }
+    });
+
+    title.appendChild(name);
+    title.appendChild(sub);
+    head.appendChild(title);
+    head.appendChild(close);
+
+    var body = createElement("div", {
+      id: "idappsh-chat-messages",
+      className: "chat-body",
+      attrs: { role: "log", "aria-live": "polite" }
+    });
+
+    var form = createElement("form", {
+      id: "idappsh-chat-form",
+      className: "chat-foot",
+      attrs: { autocomplete: "off" }
+    });
+
+    var input = createElement("input", {
+      id: "idappsh-chat-input",
+      attrs: {
+        type: "text",
+        placeholder: "Escribe tu duda…",
+        autocomplete: "off",
+        maxlength: "1600",
+        "aria-label": "Escribe tu mensaje"
+      }
+    });
+
+    var send = createElement("button", {
+      id: "idappsh-chat-send",
+      className: "chat-send",
+      attrs: { type: "submit", "aria-label": "Enviar mensaje" }
+    });
+
+    var sendIcon = createElement("i", {
+      className: "fa-solid fa-paper-plane",
+      attrs: { "aria-hidden": "true" }
+    });
+
+    send.appendChild(sendIcon);
+    form.appendChild(input);
+    form.appendChild(send);
+
+    panel.appendChild(head);
+    panel.appendChild(body);
+    panel.appendChild(form);
 
     document.body.appendChild(launcher);
     document.body.appendChild(panel);
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  function normalizeButtons(buttons) {
+    if (!Array.isArray(buttons)) return [];
+
+    return buttons
+      .filter(function (item) { return item && typeof item === "object"; })
+      .map(function (item) {
+        return {
+          label: safeText(item.label || "Opción", 70),
+          send: safeText(item.send || "", 260),
+          url: safeText(item.url || "", 500)
+        };
+      })
+      .filter(function (item) { return item.label && (item.send || item.url); });
+  }
+
+  function isInternalUrl(url) {
+    try {
+      return new URL(url, window.location.href).origin === window.location.origin;
+    } catch (error) {
+      return false;
+    }
+  }
+
+
+  /* -------------------------------------------------------
+     Contexto real de la página actual
+     - Se manda al Worker en cada mensaje.
+     - Evita que el bot responda genérico cuando está dentro de una sección.
+  ------------------------------------------------------- */
+  function isNodeVisible(node) {
+    var style;
+    var rect;
+
+    if (!node || !node.ownerDocument || !node.ownerDocument.documentElement.contains(node)) return false;
+
+    style = window.getComputedStyle ? window.getComputedStyle(node) : null;
+    if (style && (style.display === "none" || style.visibility === "hidden" || style.opacity === "0")) return false;
+
+    rect = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+    if (rect && rect.width === 0 && rect.height === 0) return false;
+
+    return true;
+  }
+
+  function cleanDomText(value, maxLength) {
+    return safeText(String(value || "").replace(/\s+/g, " "), maxLength || 800).trim();
+  }
+
+  function getReadablePageRoot() {
+    return document.querySelector("main, .site-main, [role='main']") || document.body;
+  }
+
+  function shouldIgnorePageNode(node) {
+    if (!node || node.nodeType !== 1) return true;
+
+    return Boolean(node.closest([
+      "script", "style", "noscript", "svg", "canvas",
+      "header", "footer", "nav", "#nav", ".nav", ".header", ".site-header",
+      "#idappsh-chat-panel", "#idappsh-chat-launcher",
+      "#supportPanel", "#supportOverlay", "#supportFab",
+      "#assistantModal", "#assistantOverlay", ".modal", ".support-panel", ".support-overlay"
+    ].join(",")));
+  }
+
+  function collectUniqueTexts(nodes, maxItems, maxEach) {
+    var seen = Object.create(null);
+    var out = [];
+
+    Array.prototype.forEach.call(nodes || [], function (node) {
+      var text;
+      var key;
+
+      if (out.length >= maxItems) return;
+      if (shouldIgnorePageNode(node)) return;
+      if (!isNodeVisible(node)) return;
+
+      text = cleanDomText(node.textContent, maxEach);
+      if (!text || text.length < 3) return;
+
+      key = text.toLowerCase();
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(text);
+    });
+
+    return out;
+  }
+
+  function collectPageLinks(root) {
+    var seen = Object.create(null);
+    var links = [];
+
+    Array.prototype.forEach.call((root || document).querySelectorAll("a[href]"), function (node) {
+      var label;
+      var href;
+      var url;
+      var key;
+
+      if (links.length >= 14) return;
+      if (shouldIgnorePageNode(node)) return;
+      if (!isNodeVisible(node)) return;
+
+      label = cleanDomText(node.textContent || node.getAttribute("aria-label") || "", 70);
+      href = safeText(node.getAttribute("href") || "", 500);
+      if (!label || !href) return;
+
+      try {
+        url = new URL(href, window.location.href);
+      } catch (error) {
+        return;
+      }
+
+      if (url.origin !== window.location.origin) return;
+
+      key = url.pathname + url.hash + "|" + label.toLowerCase();
+      if (seen[key]) return;
+      seen[key] = true;
+
+      links.push({ label: label, url: url.pathname + url.search + url.hash });
+    });
+
+    return links;
+  }
+
+  function detectPageContextFromPath(pathname) {
+    var path = safeText(pathname || window.location.pathname, 500).toLowerCase();
+
+    if (path.indexOf("/pages/tramites/visas-americanas") !== -1 || path.indexOf("/pages/visaspais/visa-estados-unidos") !== -1) return "visas_americanas";
+    if (path.indexOf("/pages/tramites/pasaportes") !== -1) return "pasaportes";
+    if (path.indexOf("/pages/tramites/agendado-citas") !== -1) return "agendado_citas";
+    if (path.indexOf("/pages/tramites/asesoria-personalizada") !== -1) return "asesoria";
+    if (path.indexOf("/pages/visaspais/") !== -1) return "visaspais";
+    if (path.indexOf("/pages/core/servicios") !== -1) return "servicios";
+    if (path.indexOf("/pages/core/faq") !== -1) return "faq";
+    if (path.indexOf("/pages/core/contacto") !== -1) return "contacto";
+
+    return "inicio";
+  }
+
+  function collectPageContext() {
+    var root = getReadablePageRoot();
+    var title = cleanDomText(document.title, 160);
+    var meta = document.querySelector('meta[name="description"]');
+    var description = cleanDomText(meta ? meta.getAttribute("content") : "", 260);
+    var headings = collectUniqueTexts(root.querySelectorAll("h1, h2, h3"), 18, 140);
+    var bodyTexts = collectUniqueTexts(root.querySelectorAll("p, li, article, section .desc-signature, .lead, .section-subtext, .subtitle"), 36, 260);
+
+    return {
+      context: detectPageContextFromPath(window.location.pathname),
+      title: title,
+      description: description,
+      path: window.location.pathname,
+      url: window.location.href,
+      headings: headings,
+      text: cleanDomText(bodyTexts.join("\n"), 5200),
+      links: collectPageLinks(root)
+    };
+  }
+
+  /* -------------------------------------------------------
+     Inicialización principal
+  ------------------------------------------------------- */
+  onReady(function () {
+    ensureStylesheet(CHATBOT_CSS);
     ensureChatbotMarkup();
 
-    const launcher = document.getElementById("idappsh-chat-launcher");
-    const panel = document.getElementById("idappsh-chat-panel");
-    const closeBtn = document.getElementById("idappsh-chat-close");
-    const msgList = document.getElementById("idappsh-chat-messages");
-    const input = document.getElementById("idappsh-chat-input");
-    const sendBtn = document.getElementById("idappsh-chat-send");
-    const form = document.getElementById("idappsh-chat-form");
+    var launcher = document.getElementById("idappsh-chat-launcher");
+    var panel = document.getElementById("idappsh-chat-panel");
+    var closeBtn = document.getElementById("idappsh-chat-close");
+    var msgList = document.getElementById("idappsh-chat-messages");
+    var input = document.getElementById("idappsh-chat-input");
+    var sendBtn = document.getElementById("idappsh-chat-send");
+    var form = document.getElementById("idappsh-chat-form");
 
-    const missing = [];
-    if (!launcher) missing.push("idappsh-chat-launcher");
-    if (!panel) missing.push("idappsh-chat-panel");
-    if (!closeBtn) missing.push("idappsh-chat-close");
-    if (!msgList) missing.push("idappsh-chat-messages");
-    if (!input) missing.push("idappsh-chat-input");
-    if (!sendBtn) missing.push("idappsh-chat-send");
-    if (!form) missing.push("idappsh-chat-form");
+    var booted = false;
+    var isSending = false;
+    var history = loadStoredHistory();
+    var currentContext = parseStoredContext();
+    var sessionId = parseSessionId();
+    var visitorId = getVisitorId();
+    var navStack = [];
 
-    if (missing.length) {
-      console.warn("Travel Now Chatbot: faltan elementos:", missing.join(", "));
+    if (!launcher || !panel || !closeBtn || !msgList || !input || !sendBtn || !form) {
+      if (window.console && typeof window.console.warn === "function") {
+        window.console.warn("[Travel Now chatbot] Faltan elementos para inicializar.");
+      }
       return;
     }
 
-    let isSending = false;
-    let bootedThisPage = false;
-    let visitorId = getStorage(STORAGE.visitorId) || makeId();
-    let sessionId = getStorage(STORAGE.sessionId) || makeId();
-    let visitorName = getStorage(STORAGE.visitorName);
-    let currentContext = getStorage(STORAGE.context, "inicio");
-    let history = parseJson(getStorage(STORAGE.history, "[]"), []);
-    const currentPage = getCurrentPageInfo();
-    const lastPage = getStorage(STORAGE.lastPage);
-
-    setStorage(STORAGE.visitorId, visitorId);
-    setStorage(STORAGE.sessionId, sessionId);
-    setStorage(STORAGE.lastPage, window.location.href);
-
-    if (!Array.isArray(history)) history = [];
-
-    function persistHistory() {
-      const cleaned = history
-        .filter((item) => item && typeof item === "object")
-        .map((item) => ({
-          role: item.role === "assistant" ? "assistant" : "user",
-          content: safeString(item.content, MAX_RENDERED_REPLY_CHARS)
-        }))
-        .filter((item) => item.content)
-        .slice(-MAX_HISTORY_ITEMS);
-
-      history = cleaned;
-      setStorage(STORAGE.history, JSON.stringify(cleaned));
+    function pushHistory(role, content) {
+      var item = normalizeHistoryItem({ role: role, content: content });
+      if (!item) return;
+      history.push(item);
+      history = saveStoredHistory(history);
     }
 
-    function persistContext(context) {
-      currentContext = safeString(context, 80) || "inicio";
-      setStorage(STORAGE.context, currentContext);
+    function renderStoredHistory() {
+      if (!Array.isArray(history) || !history.length) return false;
+
+      msgList.replaceChildren();
+      history.forEach(function (item) {
+        if (!item || !item.role || !item.content) return;
+        appendBubble(item.role, item.content);
+      });
+
+      return true;
     }
 
-    function appendBubble(role, text, { save = false } = {}) {
-      const div = document.createElement("div");
-      div.className = `msg ${role}`;
-      div.textContent = clipForBubble(String(text ?? ""));
+    var DEFAULT_OPTIONS = [
+      { label: "Visas americanas", send: "Quiero información sobre visas americanas" },
+      { label: "Pasaportes", send: "Quiero información sobre pasaportes" },
+      { label: "Agendar cita", send: "Quiero información sobre agendado de citas" },
+      { label: "Asesoría", send: "Quiero una asesoría personalizada" },
+      { label: "Visas por país", send: "Quiero información sobre visas por país" }
+    ];
+
+    function clearChatState() {
+      msgList.replaceChildren();
+      history = saveStoredHistory([]);
+      navStack.length = 0;
+      currentContext = parseStoredContext();
+    }
+
+    function appendBubble(role, text) {
+      var div = document.createElement("div");
+      div.className = "msg " + (role === "user" ? "user" : "assistant");
+      div.textContent = String(text == null ? "" : text);
       msgList.appendChild(div);
       msgList.scrollTop = msgList.scrollHeight;
-
-      if (save && (role === "user" || role === "assistant")) {
-        history.push({ role, content: div.textContent });
-        persistHistory();
-      }
-
       return div;
     }
 
-    function appendButtonsRow(buttons) {
-      const cleanButtons = Array.isArray(buttons) ? buttons : [];
-      const wrap = document.createElement("div");
+    function appendButtonsRow(buttons, options) {
+      var settings = options && typeof options === "object" ? options : {};
+      var validButtons = normalizeButtons(buttons);
+      var wrap;
+
+      if (!validButtons.length) return null;
+
+      wrap = document.createElement("div");
       wrap.className = "action-row";
 
-      cleanButtons
-        .filter((button) => button && typeof button === "object")
-        .slice(0, 7)
-        .forEach((button) => {
-          const label = safeString(button.label || "Opción", 70);
-          const send = safeString(button.send || "", 300);
-          const url = safeString(button.url || "", 700);
+      validButtons.forEach(function (item) {
+        if (item.url) {
+          var a = document.createElement("a");
+          var internal = isInternalUrl(item.url);
 
-          if (!label || (!send && !url)) return;
-
-          if (url) {
-            const a = document.createElement("a");
-            a.className = "action-btn";
-            a.href = url;
-            a.target = url.startsWith("http") ? "_self" : "_blank";
-            a.rel = "noopener noreferrer";
-            a.textContent = label;
-            a.addEventListener("click", () => {
-              setStorage(STORAGE.lastIntent, label);
-              persistContext(currentContext);
-              persistHistory();
-            });
-            wrap.appendChild(a);
-            return;
-          }
-
-          const btn = document.createElement("button");
-          btn.className = "action-btn";
-          btn.type = "button";
-          btn.textContent = label;
-          btn.addEventListener("click", () => {
-            wrap.remove();
-            handleAction(send);
+          a.className = "action-btn";
+          a.href = item.url;
+          a.target = internal ? "_self" : "_blank";
+          a.rel = internal ? "" : "noopener noreferrer";
+          a.textContent = item.label;
+          a.addEventListener("click", function () {
+            setLastIntent("navigation:" + item.label);
+            setLastPage(window.location.pathname);
+            saveStoredHistory(history);
           });
-          wrap.appendChild(btn);
+          wrap.appendChild(a);
+          return;
+        }
+
+        var btn = document.createElement("button");
+        btn.className = "action-btn";
+        btn.type = "button";
+        btn.textContent = item.label;
+        btn.addEventListener("click", function () {
+          wrap.remove();
+          handleAction(item.send);
         });
+        wrap.appendChild(btn);
+      });
 
       if (!wrap.childNodes.length) return null;
 
       msgList.appendChild(wrap);
       msgList.scrollTop = msgList.scrollHeight;
+
+      if (settings.pushMenu) {
+        var onlySend = validButtons.filter(function (item) { return item.send; });
+        if (onlySend.length) {
+          navStack.push({ context: currentContext, options: onlySend });
+          if (navStack.length > 30) navStack.shift();
+        }
+      }
+
       return wrap;
     }
 
-    function initialButtons() {
-      return [
+    function showStart() {
+      var alreadyRenderedHistory = renderStoredHistory();
+
+      if (!alreadyRenderedHistory) {
+        if (hasGreetedThisSession()) {
+          appendBubble(
+            "assistant",
+            "Elige una opción o escríbeme tu duda sobre visas, pasaportes, citas, DS-160 o asesoría."
+          );
+        } else {
+          appendBubble("assistant", buildGreeting());
+          markGreetedThisSession();
+        }
+      }
+
+      appendButtonsRow([
         { label: "Info. página actual", send: "__page_info__" },
         { label: "Pregunta directa", send: "__direct__" },
         { label: "WhatsApp", url: WHATSAPP_URL }
-      ];
+      ], { pushMenu: true });
     }
 
-    function showInitialGreeting() {
-      const namePart = visitorName ? `, ${visitorName}` : "";
-      const greeting = `${getHourGreeting()}${namePart} 👋\nSoy el asistente de Travel Now.\n¿En qué puedo ayudarte?`;
-
-      appendBubble("assistant", greeting, { save: false });
-      appendButtonsRow(initialButtons());
-    }
-
-    function showResumeGreeting() {
-      const changedPage = lastPage && lastPage !== window.location.href;
-      const namePart = visitorName ? `, ${visitorName}` : "";
-
-      if (changedPage) {
-        appendBubble(
-          "assistant",
-          `${getHourGreeting()}${namePart} 👋\nSeguimos aquí. Ahora estás en ${currentPage.label}.`,
-          { save: false }
-        );
-        appendButtonsRow(initialButtons());
+    function goBackMenu() {
+      if (navStack.length < 2) {
+        clearChatState();
+        showStart();
         return;
       }
 
-      showInitialGreeting();
+      navStack.pop();
+      var previous = navStack[navStack.length - 1];
+      if (previous && previous.context) {
+        currentContext = previous.context;
+        setStoredContext(currentContext);
+      }
+      appendButtonsRow(previous.options, { pushMenu: false });
     }
 
-    function renderStoredHistory() {
-      msgList.innerHTML = "";
+    function clamp(number, min, max) {
+      return Math.max(min, Math.min(max, number));
+    }
 
-      const usableHistory = Array.isArray(history) ? history.slice(-6) : [];
-      usableHistory.forEach((item) => {
-        appendBubble(item.role, item.content, { save: false });
-      });
+    function syncPanelToLauncher() {
+      var minTop;
+      var viewportGap;
+      var availableHeight;
+      var panelHeight;
+      var launcherBox;
+      var desiredTop;
+      var maxTop;
+      var top;
 
-      if (usableHistory.length) {
-        appendButtonsRow(initialButtons());
-      } else {
-        showResumeGreeting();
-      }
+      applyLayerFix();
+
+      minTop = getHeaderSafeTop();
+      viewportGap = 12;
+      availableHeight = Math.max(320, window.innerHeight - minTop - viewportGap);
+
+      panel.style.bottom = "auto";
+      panel.style.maxHeight = String(availableHeight) + "px";
+      panel.style.zIndex = String(LAYER_Z.chatPanel);
+      launcher.style.zIndex = String(LAYER_Z.chatLauncher);
+
+      panelHeight = Math.min(panel.offsetHeight || 540, availableHeight);
+      launcherBox = launcher.getBoundingClientRect();
+      desiredTop = launcherBox.top - panelHeight - 14;
+      maxTop = Math.max(minTop, window.innerHeight - panelHeight - viewportGap);
+      top = clamp(desiredTop, minTop, maxTop);
+
+      panel.style.top = String(top) + "px";
     }
 
     function openPanel() {
+      applyLayerFix();
       panel.classList.add("open");
       panel.setAttribute("aria-hidden", "false");
+      launcher.setAttribute("aria-expanded", "true");
 
-      if (!bootedThisPage) {
-        bootedThisPage = true;
-        renderStoredHistory();
+      if (!booted) {
+        booted = true;
+        msgList.replaceChildren();
+        showStart();
       }
 
-      requestAnimationFrame(() => input.focus());
+      window.requestAnimationFrame(function () {
+        syncPanelToLauncher();
+        input.focus();
+      });
     }
 
     function closePanel() {
       panel.classList.remove("open");
       panel.setAttribute("aria-hidden", "true");
+      launcher.setAttribute("aria-expanded", "false");
     }
 
     function togglePanel() {
-      if (panel.classList.contains("open")) closePanel();
-      else openPanel();
+      if (panel.classList.contains("open")) {
+        closePanel();
+        return;
+      }
+      openPanel();
     }
 
-    launcher.addEventListener("click", (event) => {
-      event.stopPropagation();
+    launcher.addEventListener("click", function (e) {
+      e.stopPropagation();
       togglePanel();
     });
 
-    closeBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
+    closeBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
       closePanel();
     });
 
-    panel.addEventListener("click", (event) => event.stopPropagation());
+    panel.addEventListener("click", function (e) { e.stopPropagation(); });
 
-    document.addEventListener("click", (event) => {
+    document.addEventListener("click", function (e) {
       if (!panel.classList.contains("open")) return;
-      if (!panel.contains(event.target) && !launcher.contains(event.target)) closePanel();
+      if (!panel.contains(e.target) && !launcher.contains(e.target)) closePanel();
     });
 
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && panel.classList.contains("open")) closePanel();
+    });
+
+    document.addEventListener("click", function (e) {
+      var trigger = e.target && e.target.closest
+        ? e.target.closest("[data-open-chatbot], [data-open-ai-chat]")
+        : null;
+      if (!trigger) return;
+      e.preventDefault();
+      openPanel();
+    });
+
+    function setupPresence() {
+      var raf = null;
+      var lock = false;
+      var minTop = 140;
+
+      function maxTop() { return Math.max(180, window.innerHeight - 170); }
+
+      function setTop(px) {
+        document.documentElement.style.setProperty("--cb-launcher-top", String(px) + "px");
+      }
+
+      function syncTop() {
+        var doc = document.documentElement;
+        var maxScroll = Math.max(1, doc.scrollHeight - window.innerHeight);
+        var progress = Math.min(1, Math.max(0, window.scrollY / maxScroll));
+        setTop(minTop + (maxTop() - minTop) * progress);
+        if (panel.classList.contains("open")) syncPanelToLauncher();
+      }
+
+      function onScrollOrResize() {
+        if (raf) return;
+        raf = window.requestAnimationFrame(function () {
+          raf = null;
+          syncTop();
+        });
+      }
+
+      function nudge() {
+        if (lock || panel.classList.contains("open") || document.visibilityState !== "visible") return;
+        lock = true;
+        launcher.classList.remove("is-nudging");
+        void launcher.offsetHeight;
+        launcher.classList.add("is-nudging");
+        window.setTimeout(function () { launcher.classList.remove("is-nudging"); }, 560);
+        window.setTimeout(function () { lock = false; }, 1200);
+      }
+
+      window.addEventListener("scroll", onScrollOrResize, { passive: true });
+      window.addEventListener("resize", onScrollOrResize, { passive: true });
+      syncTop();
+      window.setInterval(nudge, 9000);
+    }
+
+    applyLayerFix();
+    window.addEventListener("resize", applyLayerFix, { passive: true });
+    document.addEventListener("click", applyLayerFix, true);
+
+    setupPresence();
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
       sendMessage();
     });
 
-    sendBtn.addEventListener("click", (event) => {
-      event.preventDefault();
+    sendBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
       sendMessage();
     });
 
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
         sendMessage();
       }
     });
 
     async function parseResponse(response) {
-      const raw = await response.text();
+      var raw = await response.text();
+      try { return { raw: raw, data: JSON.parse(raw) }; }
+      catch (error) { return { raw: raw, data: { ok: false, reply: raw } }; }
+    }
 
-      try {
-        return { raw, data: JSON.parse(raw) };
-      } catch {
-        return { raw, data: { ok: false, reply: raw } };
-      }
+    function pickQuickActions(data) {
+      var actions = Array.isArray(data && data.quick_actions) ? data.quick_actions : [];
+      return actions
+        .filter(function (item) { return item && typeof item === "object"; })
+        .map(function (item) {
+          return { label: safeText(item.label || "Abrir", 70), url: safeText(item.url || "", 500) };
+        })
+        .filter(function (item) { return item.label && item.url; });
+    }
+
+    function pickOptions(data) {
+      var options = Array.isArray(data && data.options) ? data.options : [];
+      return options
+        .filter(function (item) { return item && typeof item === "object"; })
+        .map(function (item) {
+          return { label: safeText(item.label || "Opción", 70), send: safeText(item.send || "", 260) };
+        })
+        .filter(function (item) { return item.label && item.send; });
     }
 
     function handleAction(send) {
-      const action = safeString(send, 300);
+      var action = safeText(send, 300);
       if (!action) return;
 
+      if (action === "__page_info__") {
+        setLastIntent("page_info");
+        internalSend("__page_info__", { showUser: false });
+        return;
+      }
+
       if (action === "__direct__") {
-        setStorage(STORAGE.lastIntent, "direct_question");
-        appendBubble(
-          "assistant",
-          "Claro. Escríbeme tu duda sobre visas, pasaportes, citas o asesoría de Travel Now.",
-          { save: false }
-        );
+        setLastIntent("direct_question");
+        var msg = "Claro. Escríbeme tu duda sobre visas, pasaportes, citas, DS-160 o asesoría 🙂";
+        appendBubble("assistant", msg);
+        pushHistory("assistant", msg);
         input.focus();
         return;
       }
 
-      internalSend(action, { showUser: action !== "__page_info__" && action !== "__topics__" });
+      if (action === "__back__") {
+        goBackMenu();
+        return;
+      }
+
+      if (action === "__topics__") {
+        setLastIntent("topics");
+        internalSend("__topics__", { showUser: false });
+        return;
+      }
+
+      setLastIntent(action);
+      internalSend(action, { showUser: true });
     }
 
-    async function internalSend(text, { showUser = true } = {}) {
-      const message = safeString(text, MAX_INPUT_CHARS);
+    async function internalSend(text, options) {
+      var settings = options && typeof options === "object" ? options : {};
+      var message = safeText(text, 1600);
+      var typing;
+      var response;
+      var parsed;
+      var data;
+      var reply;
+      var quickActions;
+      var botOptions;
+
       if (!message || isSending) return;
 
       isSending = true;
       input.disabled = true;
       sendBtn.disabled = true;
 
-      const detectedName = detectName(message);
-      if (detectedName) {
-        visitorName = detectedName;
-        setStorage(STORAGE.visitorName, detectedName);
+      if (settings.showUser !== false) {
+        appendBubble("user", message);
+        pushHistory("user", message);
       }
 
-      if (showUser) appendBubble("user", message, { save: true });
+      var detectedName = settings.showUser !== false ? extractName(message) : null;
+      var isNewName = false;
 
-      const typing = appendBubble("assistant", "Escribiendo…", { save: false });
+      if (detectedName && !getVisitorName()) {
+        setVisitorName(detectedName);
+        isNewName = true;
+      }
+
+      typing = appendBubble("assistant", "Escribiendo…");
 
       try {
-        const response = await fetch(ENDPOINT, {
+        response = await fetch(WORKER_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message,
+            message: message,
             history: history.slice(-MAX_HISTORY_ITEMS),
             context: currentContext,
             session_id: sessionId,
             visitor_id: visitorId,
-            visitor_name: visitorName,
+            visitor_name: getVisitorName(),
             page_url: window.location.href,
-            page_context: currentPage.key,
-            page_label: currentPage.label,
-            max_reply_chars: MAX_RENDERED_REPLY_CHARS
+            page_path: window.location.pathname,
+            page_context: collectPageContext(),
+            max_reply_chars: MAX_REPLY_CHARS
           })
         });
 
-        const { data, raw } = await parseResponse(response);
+        parsed = await parseResponse(response);
+        data = parsed.data || {};
+
         typing.remove();
 
-        if (!response.ok || data?.ok === false) {
-          console.warn("Travel Now Chatbot error:", response.status, raw, data);
+        if (!response.ok || data.ok === false) {
+          if (window.console && typeof window.console.warn === "function") {
+            window.console.warn("[Travel Now chatbot] Error del Worker", {
+              status: response.status,
+              raw: parsed.raw,
+              data: data
+            });
+          }
 
           appendBubble(
             "assistant",
-            "No pude responder bien ahora. Puedo ayudarte por WhatsApp o puedes intentar de nuevo.",
-            { save: false }
+            "No pude conectar con el asistente en este momento. Intenta de nuevo o contáctanos por WhatsApp."
           );
 
           appendButtonsRow([
             { label: "Reintentar", send: message },
-            { label: "WhatsApp", url: WHATSAPP_URL },
-            { label: "Info. página actual", send: "__page_info__" }
-          ]);
+            { label: "Ver temas", send: "__topics__" },
+            { label: "WhatsApp", url: WHATSAPP_URL }
+          ], { pushMenu: true });
           return;
         }
 
-        if (data.context) persistContext(data.context);
+        if (typeof data.context === "string" && data.context.trim()) {
+          currentContext = data.context.trim();
+          setStoredContext(currentContext);
+          setLastIntent(currentContext);
+        }
 
-        const reply = clipForBubble(data.reply || "¿Qué trámite necesitas revisar?");
-        appendBubble("assistant", reply, { save: true });
+        if (isNewName) {
+          var nameAck = "Mucho gusto, " + detectedName + " 👋";
+          appendBubble("assistant", nameAck);
+          pushHistory("assistant", nameAck);
+        }
 
-        const quickActions = Array.isArray(data.quick_actions) ? data.quick_actions : [];
-        const options = Array.isArray(data.options) ? data.options : [];
+        reply = safeText(data.reply || "", MAX_REPLY_CHARS);
 
-        if (quickActions.length) appendButtonsRow(quickActions);
-        if (options.length) appendButtonsRow(options);
-        if (!quickActions.length && !options.length) appendButtonsRow(initialButtons());
+        if (reply) {
+          appendBubble("assistant", reply);
+          pushHistory("assistant", reply);
+        } else {
+          var fallback = "Puedo ayudarte con visas, pasaportes, citas o asesoría personalizada. ¿Qué trámite necesitas revisar?";
+          appendBubble("assistant", fallback);
+          pushHistory("assistant", fallback);
+        }
+
+        quickActions = pickQuickActions(data);
+        if (quickActions.length) appendButtonsRow(quickActions, { pushMenu: false });
+
+        botOptions = pickOptions(data);
+        appendButtonsRow(botOptions.length ? botOptions : DEFAULT_OPTIONS, { pushMenu: true });
+
       } catch (error) {
         typing.remove();
 
-        console.warn("Travel Now Chatbot fetch failed:", error);
+        if (window.console && typeof window.console.warn === "function") {
+          window.console.warn("[Travel Now chatbot] Fetch falló", error);
+        }
 
         appendBubble(
           "assistant",
-          "Se perdió la conexión. Intenta otra vez o contáctanos por WhatsApp.",
-          { save: false }
+          "Se perdió la conexión con el asistente. Intenta otra vez o contáctanos por WhatsApp."
         );
 
         appendButtonsRow([
           { label: "Reintentar", send: message },
           { label: "WhatsApp", url: WHATSAPP_URL },
-          { label: "Info. página actual", send: "__page_info__" }
-        ]);
+          { label: "Ver temas", send: "__topics__" }
+        ], { pushMenu: true });
       } finally {
         isSending = false;
         input.disabled = false;
@@ -627,21 +1172,10 @@
     }
 
     function sendMessage() {
-      const text = safeString(input.value, MAX_INPUT_CHARS);
+      var text = safeText(input.value, 1600);
       if (!text) return;
       input.value = "";
       internalSend(text, { showUser: true });
     }
-
-    document.addEventListener("click", (event) => {
-      const trigger = event.target.closest("[data-open-chatbot], [data-open-assistant]");
-      if (!trigger) return;
-
-      const href = trigger.getAttribute("href") || "";
-      if (href === "#assistantModal") return;
-
-      event.preventDefault();
-      openPanel();
-    });
   });
 })();
