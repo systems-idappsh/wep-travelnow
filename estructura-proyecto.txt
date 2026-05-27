@@ -1,0 +1,182 @@
+Listado de rutas de carpetas
+El n£mero de serie del volumen es ECCE-38C3
+C:.
+|   CNAME
+|   Descripci¢n detallada del objetivo.md
+|   estructura-proyecto.txt
+|   favicon.ico
+|   index.html
+|   REPORTE_CORRECCION.md
+|   robots.txt
+|   site.webmanifest
+|   sitemap.xml
+|   
++---assets
+|   +---css
+|   |   +---core
+|   |   |       contacto.css
+|   |   |       faq.css
+|   |   |       index_styles.css
+|   |   |       legal.css
+|   |   |       nosotros.css
+|   |   |       pais.css
+|   |   |       servicios.css
+|   |   |       styles_contacto.css
+|   |   |       styles_serv.css
+|   |   |       tramites.css
+|   |   |       
+|   |   +---global
+|   |   |       base_styles.css
+|   |   |       grit_signature.css
+|   |   |       tramites.css
+|   |   |       
+|   |   \---layout
+|   |           chatbot.css
+|   |           componete_bandera.css
+|   |           media.css
+|   |           nav-footer.css
+|   |           process-work.css
+|   |           process_steps.css
+|   |           support_fab_styles.css
+|   |           
+|   +---icons
+|   |       android-chrome-192x192.png
+|   |       android-chrome-512x512.png
+|   |       apple-touch-icon.ico
+|   |       apple-touch-icon.png
+|   |       apple-touch-icon.svg
+|   |       favicon-16x16.png
+|   |       favicon-16x16.svg
+|   |       favicon-32x32.png
+|   |       favicon-32x32.svg
+|   |       favicon-48x48.png
+|   |       favicon-48x48.svg
+|   |       favicon-96x96.png
+|   |       favicon-96x96.svg
+|   |       favicon.ico
+|   |       favicon.png
+|   |       favicon.svg
+|   |       favicon.webp
+|   |       
+|   +---img
+|   |   +---banner
+|   |   |       agendado-citas.webp
+|   |   |       asesoria-personalizada.webp
+|   |   |       pasaportes.webp
+|   |   |       visas-americanas.webp
+|   |   |       
+|   |   +---hero
+|   |   +---logo
+|   |   |       icno-travel-now.ico
+|   |   |       logo.jpeg
+|   |   |       logo.svg
+|   |   |       
+|   |   +---mp4
+|   |   |       flotante1.webp
+|   |   |       mini_video.png
+|   |   |       Video_Edits_And_Logo_Integration.mp4
+|   |   |       
+|   |   +---og
+|   |   |       travel-now-link-og.webp
+|   |   |       
+|   |   +---pag_contacto
+|   |   |       asesora.jpg
+|   |   |       reunion.jpeg
+|   |   |       reunion.jpg
+|   |   |       
+|   |   +---seo
+|   |   |       contacto-og.webp
+|   |   |       faq-og.webp
+|   |   |       home-og.webp
+|   |   |       nosotros-og.webp
+|   |   |       pais-austria-og.webp
+|   |   |       pais-canada.og.webp
+|   |   |       pais-china-og.webp
+|   |   |       pais-estados-unidos-og.webp
+|   |   |       pais-india-og.webp
+|   |   |       pais-reino-unido-og.webp
+|   |   |       pais-sudafrica-og.webp
+|   |   |       pais-taiwan-og.webp
+|   |   |       pais-turquia-og.webp
+|   |   |       servicios-og.webp
+|   |   |       
+|   |   \---visaspais
+|   |           visa-australia.jpeg
+|   |           visa-canada.jpeg
+|   |           visa-china.jpeg
+|   |           visa-estados-unidos.jpeg
+|   |           visa-india.jpeg
+|   |           visa-reino-unido.jpeg
+|   |           visa-sudafrica.webp
+|   |           visa-taiwan.webp
+|   |           
+|   \---js
+|           assistant_form.js
+|           carousel.js
+|           chatbot.js
+|           faq.js
+|           index_hero.js
+|           main.js
+|           media.js
+|           nosotros.js
+|           pais.js
+|           process-work.js
+|           process_steps.js
+|           security-guard.js
+|           support_fab.js
+|           tramites.js
+|           
++---Cloudflare Worker
+|       Captura.PNG
+|       Captura2.PNG
+|       worker.js
+|       
++---kb
+|       agendado-citas_kb.md
+|       asesoria_kb.md
+|       contacto_kb.md
+|       faq_kb.md
+|       pasaporte_kb.md
+|       servicios_kb.md
+|       site_kb.md
+|       travelnow_kb.md
+|       visa-americana_kb.md
+|       visaspais_kb.md
+|       worker_variables_kb.md
+|       
++---layout
+|       chatbot.js
+|       componente_bandera.js
+|       footer.js
+|       header.js
+|       layout-loader.js
+|       nav-data.js
+|       support.js
+|       
+\---pages
+    +---core
+    |       contacto.html
+    |       faq.html
+    |       nosotros.html
+    |       servicios.html
+    |       
+    +---legal
+    |       aviso_privacidad.html
+    |       terminos_condiciones.html
+    |       
+    +---tramites
+    |       agendado-citas.html
+    |       asesoria-personalizada.html
+    |       pasaportes.html
+    |       visas-americanas.html
+    |       
+    \---visaspais
+            visa-australia.html
+            visa-canada.html
+            visa-china.html
+            visa-estados-unidos.html
+            visa-india.html
+            visa-reino-unido.html
+            visa-sudafrica.html
+            visa-taiwan.html
+            

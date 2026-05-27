@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Bloqueos técnicos
+Disallow: /docs/
+Disallow: /kb/
+Disallow: /.vscode/
+Disallow: /Cloudflare%20Worker/
+Disallow: /Cloudflare Worker/
+Disallow: /assets/css/legacy/
+
+# Evitar indexación de archivos internos o documentación suelta
+Disallow: /*.txt$
+Disallow: /*.md$
+
+# Sitemap principal
+Sitemap: https://travel-now.com.mx/sitemap.xml
