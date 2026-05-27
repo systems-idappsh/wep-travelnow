@@ -1,0 +1,322 @@
+/* =========================================================
+   TRAVEL NOW — PROCESS STEPS v3.0 RESPONSIVE
+   - Grid 4→2 fluido sin colapso brusco
+   - Tipografía y círculos escalados con clamp()
+   - SVG path oculto en mobile limpiamente
+========================================================= */
+
+#travelingDotProcess {
+  position: relative;
+  padding: clamp(48px, 8vw, 72px) 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top, rgba(78,150,200,.25), transparent 45%),
+    linear-gradient(135deg, #031b35, #062947);
+  color: #fff;
+}
+
+#travelingDotProcess .procsserv {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 5vw, 48px);
+}
+
+/* =========================================================
+   HEADER
+========================================================= */
+#travelingDotProcess .proceso-servicios {
+  margin-bottom: clamp(28px, 5vw, 56px);
+}
+
+#travelingDotProcess .proceso-servicios h2 {
+  color: #fff;
+  font-size: clamp(1.5rem, 3.5vw, 2.4rem);
+}
+
+#travelingDotProcess .steps {
+  max-width: 720px;
+  margin: clamp(16px, 3vw, 24px) auto 0;
+  padding-left: clamp(16px, 3vw, 20px);
+  text-align: left;
+  color: rgba(255,255,255,.72);
+  font-size: clamp(0.85rem, 1.3vw, 1rem);
+}
+
+/* =========================================================
+   WRAP
+========================================================= */
+#travelingDotProcess .process-wrap {
+  position: relative;
+  padding-top: clamp(16px, 3vw, 24px);
+}
+
+/* =========================================================
+   SVG PATH — Solo visible en desktop
+========================================================= */
+#travelingDotProcess .path-svg {
+  position: absolute;
+  left: 6%;
+  top: 38px;
+  width: 88%;
+  height: 96px;
+  max-width: none !important;
+  overflow: visible;
+  z-index: 1;
+  pointer-events: none;
+}
+
+#travelingDotProcess .path-base {
+  fill: none;
+  stroke: rgba(255,255,255,.12);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+#travelingDotProcess .path-active {
+  fill: none;
+  stroke: url(#travelNowProcessGrad);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  filter:
+    drop-shadow(0 0 10px rgba(81,214,199,.85))
+    drop-shadow(0 0 22px rgba(81,214,199,.45));
+}
+
+#travelingDotProcess.is-animating .path-active {
+  opacity: 1;
+  animation: processDrawPath 3.8s cubic-bezier(.65,0,.35,1) forwards;
+}
+
+#travelingDotProcess.is-complete .path-active {
+  opacity: 1;
+  stroke-dashoffset: 0;
+}
+
+@keyframes processDrawPath {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* =========================================================
+   TRAVEL DOT
+========================================================= */
+#travelingDotProcess .travel-dot {
+  position: absolute;
+  left: 6%;
+  top: 39px;
+  width: clamp(12px, 2vw, 16px);
+  height: clamp(12px, 2vw, 16px);
+  border-radius: 999px;
+  background: #51d6c7;
+  box-shadow: 0 0 12px #51d6c7, 0 0 28px rgba(81,214,199,.95);
+  offset-path: path("M 20 50 C 160 0, 250 100, 380 50 S 600 0, 760 50 S 940 100, 1080 50");
+  offset-distance: 0%;
+  opacity: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+#travelingDotProcess.is-animating .travel-dot {
+  animation: processTravelDot 3.8s cubic-bezier(.65,0,.35,1) forwards;
+}
+
+@keyframes processTravelDot {
+  0%   { offset-distance: 0%;   opacity: 0; }
+  6%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+/* =========================================================
+   GRID — Fluido 4→2 sin colapso total
+========================================================= */
+#travelingDotProcess .proceso-steps {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: clamp(14px, 2.5vw, 24px);
+}
+
+/* 4 columnas reales en desktop */
+@media (min-width: 760px) {
+  #travelingDotProcess .proceso-steps {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+#travelingDotProcess .proceso-step {
+  min-width: 0;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* =========================================================
+   STEP CIRCLE — Fluido
+========================================================= */
+#travelingDotProcess .step-circle {
+  width: clamp(48px, 8vw, 68px);
+  height: clamp(48px, 8vw, 68px);
+  margin: 0 auto clamp(12px, 2.5vw, 18px);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: clamp(0.9rem, 2vw, 1.35rem);
+  color: rgba(255,255,255,.45);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,.16), rgba(255,255,255,.04) 60%),
+    rgba(4,40,72,.95);
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 0 0 clamp(5px, 1.5vw, 8px) rgba(255,255,255,.04);
+  transition:
+    transform .35s ease,
+    border-color .35s ease,
+    box-shadow .35s ease,
+    background .35s ease;
+}
+
+#travelingDotProcess .step-circle i {
+  color: rgba(255,255,255,.45);
+  transition:
+    color .35s ease,
+    transform .35s cubic-bezier(.2,.8,.2,1),
+    filter .35s ease;
+}
+
+/* =========================================================
+   ESTADO COMPLETADO
+========================================================= */
+#travelingDotProcess .proceso-step.is-complete .step-circle {
+  border-color: rgba(81,214,199,.75);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(81,214,199,.42), rgba(46,159,145,.12) 60%),
+    rgba(4,40,72,.95);
+  box-shadow:
+    0 0 0 8px rgba(46,159,145,.10),
+    0 0 34px rgba(81,214,199,.45);
+  transform: translateY(clamp(-4px, -1vw, -7px)) scale(1.06);
+}
+
+#travelingDotProcess .proceso-step:nth-child(1).is-complete .step-circle i { color: #51d6c7; }
+#travelingDotProcess .proceso-step:nth-child(2).is-complete .step-circle i { color: #28f265; }
+#travelingDotProcess .proceso-step:nth-child(3).is-complete .step-circle i { color: #ffa908; }
+#travelingDotProcess .proceso-step:nth-child(4).is-complete .step-circle i { color: #ff0000; }
+
+#travelingDotProcess .proceso-step.is-complete .step-circle i {
+  transform: scale(1.12);
+  filter:
+    drop-shadow(0 0 6px rgba(81,214,199,.85))
+    drop-shadow(0 0 16px rgba(81,214,199,.65));
+}
+
+/* =========================================================
+   TEXTO CON TRANSICIÓN
+========================================================= */
+#travelingDotProcess .proceso-step h4,
+#travelingDotProcess .proceso-step p {
+  transition:
+    color .35s ease,
+    opacity .35s ease,
+    transform .35s ease,
+    text-shadow .35s ease;
+}
+
+#travelingDotProcess .proceso-step.is-complete h4 {
+  color: #ffffff;
+  transform: translateY(-3px);
+  text-shadow: 0 0 10px rgba(81,214,199,.45), 0 0 22px rgba(81,214,199,.28);
+}
+
+#travelingDotProcess .proceso-step.is-complete p {
+  color: rgba(255,255,255,.92);
+  opacity: 1;
+  transform: translateY(-2px);
+  text-shadow: 0 0 8px rgba(255,255,255,.16);
+}
+
+#travelingDotProcess .proceso-step:nth-child(1).is-complete h4 { color: #51d6c7; }
+#travelingDotProcess .proceso-step:nth-child(2).is-complete h4 { color: #28f265; }
+#travelingDotProcess .proceso-step:nth-child(3).is-complete h4 { color: #ffa908; }
+#travelingDotProcess .proceso-step:nth-child(4).is-complete h4 { color: #ff6b6b; }
+
+/* =========================================================
+   HOVER
+========================================================= */
+#travelingDotProcess .proceso-step:hover h4 {
+  color: #ffffff;
+  transform: translateY(-4px);
+  text-shadow: 0 0 12px rgba(81,214,199,.65), 0 0 28px rgba(81,214,199,.35);
+}
+
+#travelingDotProcess .proceso-step:hover p {
+  color: #ffffff;
+  transform: translateY(-3px);
+}
+
+#travelingDotProcess .proceso-step:hover .step-circle {
+  transform: translateY(clamp(-5px, -1.5vw, -8px)) scale(1.08);
+  border-color: rgba(81,214,199,.9);
+  box-shadow:
+    0 0 0 10px rgba(46,159,145,.12),
+    0 0 42px rgba(81,214,199,.55);
+}
+
+#travelingDotProcess .proceso-step:hover .step-circle i {
+  color: #fff;
+  transform: scale(1.18) rotate(-6deg);
+  filter:
+    drop-shadow(0 0 10px rgba(81,214,199,1))
+    drop-shadow(0 0 22px rgba(81,214,199,.8));
+}
+
+/* =========================================================
+   TIPOGRAFÍA DEL PASO
+========================================================= */
+#travelingDotProcess .proceso-step h4 {
+  color: #fff;
+  font-size: clamp(0.78rem, 1.3vw, 1rem);
+  line-height: 1.2;
+  margin-bottom: clamp(6px, 1vw, 10px);
+}
+
+#travelingDotProcess .proceso-step p {
+  max-width: 240px;
+  margin: 0 auto;
+  font-size: clamp(0.74rem, 1.1vw, 0.9rem);
+  color: rgba(255,255,255,.68);
+}
+
+/* =========================================================
+   MOBILE — Grid 2x2 con cards
+========================================================= */
+@media (max-width: 760px) {
+  #travelingDotProcess .path-svg,
+  #travelingDotProcess .travel-dot {
+    display: none;
+  }
+
+  #travelingDotProcess .proceso-steps {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(10px, 3vw, 14px);
+  }
+
+  #travelingDotProcess .proceso-step {
+    padding: clamp(12px, 3vw, 16px) clamp(8px, 2vw, 10px);
+    border-radius: clamp(16px, 4vw, 20px);
+    background: rgba(255,255,255,.075);
+    border: 1px solid rgba(255,255,255,.09);
+  }
+
+  /* No hover transform en touch */
+  @media (hover: none) {
+    #travelingDotProcess .proceso-step:hover .step-circle { transform: none; }
+    #travelingDotProcess .proceso-step:hover h4 { transform: none; }
+    #travelingDotProcess .proceso-step:hover p  { transform: none; }
+  }
+}

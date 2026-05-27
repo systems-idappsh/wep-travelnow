@@ -1,0 +1,547 @@
+/* =========================================================
+   TRAVEL NOW — BASE STYLES v3.0 RESPONSIVE ARCHITECTURE
+   Sistema responsive profesional tipo app nativa
+   - Fluid scaling system
+   - Intrinsic layouts
+   - Container-based responsive
+   - No breakpoint hell
+   - Production-grade frontend
+========================================================= */
+
+/* === RESET MODERNO === */
+*, *::before, *::after { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
+
+/* =========================================================
+   DESIGN TOKENS — Sistema unificado
+   Paleta canónica única (sin duplicados)
+========================================================= */
+:root {
+  /* --- PALETA DE MARCA (canónica) --- */
+  --color-forest:    #043447;
+  --color-teal:      #2E9F91;
+  --color-teal-dark: #248578;
+  --color-oxford:    #073c79;
+  --color-oxford-soft: #1F3C88;
+  --color-steel:     #4E96C8;
+  --color-steel-dark:#3A7BAB;
+  --color-platinum:  #E6E6E6;
+
+  /* --- Mapeo semántico --- */
+  --color-primary:        var(--color-forest);
+  --color-primary-hover:  var(--color-oxford);
+  --color-brand:          var(--color-forest);
+  --color-accent:         var(--color-teal);
+  --color-accent-dark:    var(--color-teal-dark);
+  --color-secondary:      var(--color-steel);
+  --color-secondary-dark: var(--color-steel-dark);
+
+  /* --- Superficies --- */
+  --color-bg:        #FFFFFF;
+  --color-bg-soft:   #F5F6F8;
+  --color-bg-card:   #FFFFFF;
+  --color-bg-muted:  var(--color-platinum);
+  --color-border:    #E4E8F0;
+  --color-border-soft: rgba(0,33,71,.08);
+
+  /* --- Textos --- */
+  --color-text:        var(--color-oxford);
+  --color-text-muted:  #5B6B82;
+  --color-text-light:  #94A3B8;
+
+  /* --- Funcionales --- */
+  --color-success: #22C55E;
+  --color-error:   #EF4444;
+  --color-warning: #F59E0B;
+  --color-wa:      #25D366;
+
+  /* --- TIPOGRAFÍA --- */
+  --font-body:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Poppins', system-ui, sans-serif;
+  --font-heading: 'Montserrat', system-ui, sans-serif;
+  --font-hero:    'Poppins', system-ui, sans-serif;
+
+  /* --- SISTEMA DE ESPACIADO FLUIDO --- 
+       Escala de forma proporcional según viewport
+  */
+  --space-3xs: clamp(2px,  0.25vw, 4px);
+  --space-2xs: clamp(4px,  0.5vw,  6px);
+  --space-xs:  clamp(6px,  0.75vw, 8px);
+  --space-sm:  clamp(8px,  1vw,    12px);
+  --space-md:  clamp(12px, 1.5vw,  16px);
+  --space-lg:  clamp(16px, 2vw,    24px);
+  --space-xl:  clamp(24px, 3vw,    40px);
+  --space-2xl: clamp(40px, 5vw,    64px);
+  --space-3xl: clamp(64px, 8vw,    96px);
+  --space-4xl: clamp(96px, 12vw,   128px);
+
+  /* --- SISTEMA TIPOGRÁFICO FLUIDO ---
+       Escala continua entre breakpoints, no saltos bruscos
+  */
+  --text-xs:   clamp(0.75rem,  0.7rem + 0.25vw,  0.875rem);
+  --text-sm:   clamp(0.875rem, 0.85rem + 0.25vw, 1rem);
+  --text-base: clamp(1rem,     0.95rem + 0.25vw, 1.125rem);
+  --text-lg:   clamp(1.125rem, 1rem + 0.5vw,     1.25rem);
+  --text-xl:   clamp(1.25rem,  1.1rem + 0.75vw,  1.5rem);
+  --text-2xl:  clamp(1.5rem,   1.3rem + 1vw,     2rem);
+  --text-3xl:  clamp(1.875rem, 1.5rem + 1.5vw,   2.5rem);
+  --text-4xl:  clamp(2.25rem,  1.75rem + 2vw,    3rem);
+  --text-5xl:  clamp(2.5rem,   2rem + 2.5vw,     3.5rem);
+  --text-6xl:  clamp(3rem,     2.5rem + 3vw,     4rem);
+
+  /* --- RADIOS --- */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   12px;
+  --radius-lg:   20px;
+  --radius-xl:   28px;
+  --radius-full: 9999px;
+
+  /* --- SOMBRAS --- */
+  --shadow-xs: 0 1px 2px rgba(0,33,71,.04);
+  --shadow-sm: 0 1px 3px rgba(0,33,71,.06), 0 1px 2px rgba(0,33,71,.04);
+  --shadow-md: 0 4px 16px rgba(0,33,71,.08), 0 2px 6px rgba(0,33,71,.04);
+  --shadow-lg: 0 12px 40px rgba(0,33,71,.12), 0 4px 12px rgba(0,33,71,.06);
+  --shadow-xl: 0 24px 64px rgba(0,33,71,.15);
+
+  /* --- TRANSICIONES --- */
+  --transition-fast:  .15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base:  .25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow:  .4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- LAYOUT CONTAINER FLUIDO ---
+       Se adapta inteligentemente, no hard breakpoints
+  */
+  --container-max:  1200px;
+  --container-pad:  clamp(1rem, 5vw, 3rem);
+  --container-gap:  clamp(1rem, 3vw, 2rem);
+
+  /* --- VIEWPORT BREAKPOINTS (referencia para lógica) --- */
+  --bp-sm:  640px;
+  --bp-md:  768px;
+  --bp-lg:  1024px;
+  --bp-xl:  1280px;
+  --bp-2xl: 1536px;
+}
+
+/* =========================================================
+   HTML & BODY — Base estable para layouts fluidos
+========================================================= */
+html {
+  height: 100%;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.65;
+  color: var(--color-text);
+  background: var(--color-bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+main, 
+.site-main { 
+  flex: 1 0 auto; 
+  width: 100%; 
+  min-width: 0; /* Previene overflow en flex items */
+}
+
+footer { 
+  margin-top: auto; 
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   MEDIA RESPONSIVOS — Intrinsic sizing
+========================================================= */
+img, 
+picture, 
+video, 
+canvas, 
+svg { 
+  display: block; 
+  max-width: 100%; 
+  height: auto;
+}
+
+picture {
+  display: contents;
+}
+
+/* =========================================================
+   LINKS — Estados interactivos profesionales
+========================================================= */
+a { 
+  color: var(--color-accent); 
+  text-decoration: none; 
+  transition: color var(--transition-fast);
+  cursor: pointer;
+}
+
+a:hover { 
+  color: var(--color-secondary); 
+}
+
+a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* =========================================================
+   TIPOGRAFÍA FLUIDA — Sistema escalable profesional
+========================================================= */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-primary);
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-md);
+}
+
+h1 { font-size: var(--text-5xl); }
+h2 { font-size: var(--text-4xl); }
+h3 { font-size: var(--text-3xl); }
+h4 { font-size: var(--text-2xl); }
+h5 { font-size: var(--text-xl); }
+h6 { font-size: var(--text-lg); }
+
+p {
+  margin-bottom: var(--space-md);
+  max-width: 70ch; /* Previene líneas demasiado largas */
+}
+
+.display-font { font-family: var(--font-display); }
+.text-muted   { color: var(--color-text-muted); }
+.text-accent  { color: var(--color-accent); }
+
+/* =========================================================
+   CONTENEDOR FLUIDO — Layout principal adaptativo
+========================================================= */
+.container,
+.wrapper {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--container-pad);
+  min-width: 0; /* Previene overflow */
+}
+
+/* =========================================================
+   BOTONES — Sistema escalable y responsive
+========================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(1rem, 3vw, 1.75rem);
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: 
+    transform var(--transition-base), 
+    box-shadow var(--transition-base), 
+    background-color var(--transition-base), 
+    color var(--transition-base);
+  white-space: nowrap;
+  line-height: 1;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-dark);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+}
+
+.btn-outline:hover {
+  background: var(--color-primary);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.btn-wa {
+  background: var(--color-wa);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-wa:hover {
+  background: #1ebe5d;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* =========================================================
+   UTILIDADES RESPONSIVE
+========================================================= */
+.text-center { 
+  text-align: center; 
+}
+
+.section-label {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+/* =========================================================
+   ANIMACIONES — Motion UI profesional
+========================================================= */
+@keyframes fadeInUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(clamp(16px, 3vw, 24px)); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; } 
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(clamp(16px, 3vw, 24px));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-in         { animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.animate-in-delay-1 { animation-delay: 0.1s; }
+.animate-in-delay-2 { animation-delay: 0.2s; }
+.animate-in-delay-3 { animation-delay: 0.3s; }
+
+/* =========================================================
+   SCROLLBAR — Estilo consistente
+========================================================= */
+::-webkit-scrollbar { 
+  width: 6px; 
+}
+
+::-webkit-scrollbar-track { 
+  background: var(--color-bg-soft); 
+}
+
+::-webkit-scrollbar-thumb { 
+  background: var(--color-border); 
+  border-radius: 3px; 
+}
+
+::-webkit-scrollbar-thumb:hover { 
+  background: var(--color-text-muted); 
+}
+
+/* =========================================================
+   SELECTION
+========================================================= */
+::selection { 
+  background: rgba(46,159,145,0.22); 
+  color: var(--color-primary); 
+}
+
+/* =========================================================
+   FORMS BASE — Inputs responsivos
+========================================================= */
+input, 
+select, 
+textarea {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  min-width: 0; /* Previene overflow */
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(46,159,145,0.1);
+}
+
+/* =========================================================
+   BREADCRUMB — Navegación fluida
+========================================================= */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  padding: var(--space-md) 0;
+  flex-wrap: wrap;
+}
+
+.breadcrumb a { 
+  color: var(--color-text-muted); 
+  transition: color var(--transition-fast);
+}
+
+.breadcrumb a:hover { 
+  color: var(--color-accent); 
+}
+
+.breadcrumb .sep { 
+  opacity: 0.5; 
+  user-select: none;
+}
+
+.breadcrumb .current { 
+  color: var(--color-text); 
+  font-weight: 500; 
+}
+
+/* =========================================================
+   ACCESSIBILITY — Reduced motion
+========================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  #travelingDotProcess .path-active,
+  #travelingDotProcess .travel-dot {
+    animation-duration: 3.8s !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* =========================================================
+   RESPONSIVE UTILITIES — Mobile-first approach
+========================================================= */
+
+/* Ocultar en mobile, mostrar en desktop */
+.hide-on-mobile {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .hide-on-mobile {
+    display: block;
+  }
+}
+
+/* Ocultar en desktop, mostrar en mobile */
+.hide-on-desktop {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .hide-on-desktop {
+    display: none;
+  }
+}
+
+/* =========================================================
+   FOCUS VISIBLE — Accesibilidad keyboard navigation
+========================================================= */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* =========================================================
+   PRINT STYLES — Optimización para impresión
+========================================================= */
+@media print {
+  *,
+  *::before,
+  *::after {
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  a,
+  a:visited {
+    text-decoration: underline;
+  }
+
+  img {
+    page-break-inside: avoid;
+  }
+
+  p,
+  h2,
+  h3 {
+    orphans: 3;
+    widows: 3;
+  }
+
+  h2,
+  h3 {
+    page-break-after: avoid;
+  }
+}
