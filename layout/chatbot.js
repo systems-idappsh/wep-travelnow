@@ -1,5 +1,5 @@
 /* =========================================================
-   /layout/chatbot.js — Travel Now Chatbot IA v2.4
+   /layout/chatbot.js — Travel Now Chatbot IA v2.7
    Corrección quirúrgica:
    - Historial real persistido en TRAVEL_NOW_CHAT_HISTORY
    - Extractor de nombre seguro con blocklist para patrón "soy X"
@@ -25,8 +25,9 @@
   var CHATBOT_CSS = "/assets/css/layout/chatbot.css";
   var CHATBOT_ICON = "/assets/img/mp4/flotante1.webp";
   var MAX_REPLY_CHARS = 520;
-  var MAX_HISTORY_ITEMS = 2;
-  var MAX_HISTORY_CHARS = 300;
+  var MAX_HISTORY_ITEMS = 10;
+  var MAX_HISTORY_CHARS = 900;
+  var CHATBOT_STATE_VERSION = "2.7";
 
   // Capas controladas por JS para evitar que header/nav tape asistentes o modales.
   var LAYER_Z = {
@@ -48,6 +49,7 @@
   var LAST_INTENT_KEY = "TRAVEL_NOW_LAST_INTENT";
   var HISTORY_KEY = "TRAVEL_NOW_CHAT_HISTORY";
   var GREETING_SHOWN_KEY = "TRAVEL_NOW_GREETING_SHOWN";
+  var STATE_VERSION_KEY = "TRAVEL_NOW_CHATBOT_STATE_VERSION";
 
   var SOY_BLOCKLIST = [
     "estudiante", "mexicano", "mexicana", "menor", "cliente", "usuario",
@@ -134,6 +136,18 @@
 
   function ssSet(key, value) {
     try { sessionStorage.setItem(key, String(value)); } catch (error) { /* noop */ }
+  }
+
+  function ensureCleanStateForVersion() {
+    var current = lsGet(STATE_VERSION_KEY);
+    if (current === CHATBOT_STATE_VERSION) return;
+
+    // Limpia conversaciones viejas que guardaban saludos, prompts o respuestas genéricas.
+    lsRemove(HISTORY_KEY);
+    lsRemove(CONTEXT_KEY);
+    lsRemove(LAST_INTENT_KEY);
+    try { sessionStorage.removeItem(GREETING_SHOWN_KEY); } catch (error) { /* noop */ }
+    lsSet(STATE_VERSION_KEY, CHATBOT_STATE_VERSION);
   }
 
   function hasGreetedThisSession() {
@@ -282,14 +296,14 @@
     setLastPage(currentPath);
 
     if (name && lastPage && lastPage !== currentPath) {
-      return saludo + ", " + name + " 🤖🚬 \nSeguimos aquí.🗣️💨";
+      return saludo + ", " + name + " 👋\nSeguimos aquí. ¿En qué puedo ayudarte?";
     }
 
     if (name) {
-      return saludo + ", " + name + " 🥱 \nSoy el asistente de Travel Now. ¿En qué puedo ayudarte? 🛀";
+      return saludo + ", " + name + " 👋\nSoy el asistente de Travel Now. ¿En qué puedo ayudarte?";
     }
 
-    return saludo + " ✈️ Soy el asistente de Travel Now.\n   🤖🫰 ¿En qué puedo ayudarte? ";
+    return saludo + " 👋 Soy el asistente de Travel Now.\n¿En qué puedo ayudarte?";
   }
 
   /* -------------------------------------------------------
@@ -492,6 +506,7 @@
   }
 
   function normalizeButtons(buttons) {
+    var seen = Object.create(null);
     if (!Array.isArray(buttons)) return [];
 
     return buttons
@@ -503,7 +518,14 @@
           url: safeText(item.url || "", 500)
         };
       })
-      .filter(function (item) { return item.label && (item.send || item.url); });
+      .filter(function (item) {
+        var key;
+        if (!item.label || !(item.send || item.url)) return false;
+        key = (item.label + "|" + item.send + "|" + item.url).toLowerCase();
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      });
   }
 
   function isInternalUrl(url) {
@@ -665,6 +687,8 @@
     var sendBtn = document.getElementById("idappsh-chat-send");
     var form = document.getElementById("idappsh-chat-form");
 
+    ensureCleanStateForVersion();
+
     var booted = false;
     var isSending = false;
     var history = loadStoredHistory();
@@ -782,16 +806,9 @@
     function showStart() {
       var alreadyRenderedHistory = renderStoredHistory();
 
-      if (!alreadyRenderedHistory) {
-        if (hasGreetedThisSession()) {
-          appendBubble(
-            "assistant",
-            "Elige una opción o escríbeme tu duda sobre visas, pasaportes, citas, DS-160 o asesoría."
-          );
-        } else {
-          appendBubble("assistant", buildGreeting());
-          markGreetedThisSession();
-        }
+      if (!alreadyRenderedHistory && !hasGreetedThisSession()) {
+        appendBubble("assistant", buildGreeting());
+        markGreetedThisSession();
       }
 
       appendButtonsRow([
@@ -1018,9 +1035,8 @@
 
       if (action === "__direct__") {
         setLastIntent("direct_question");
-        var msg = "Claro. Escríbeme tu duda sobre visas, pasaportes, citas, DS-160 o asesoría 🙂";
+        var msg = "Claro. Escríbeme tu duda sobre visas, pasaportes, citas, DS-160 o asesoría.";
         appendBubble("assistant", msg);
-        pushHistory("assistant", msg);
         input.focus();
         return;
       }
@@ -1135,7 +1151,7 @@
           appendBubble("assistant", reply);
           pushHistory("assistant", reply);
         } else {
-          var fallback = "fallbacak   👾🤯🤕🤧🫯   ";
+          var fallback = "No pude generar una respuesta útil. Escríbeme la duda con más detalle o contáctanos por WhatsApp.";
           appendBubble("assistant", fallback);
           pushHistory("assistant", fallback);
         }
@@ -1155,7 +1171,7 @@
 
         appendBubble(
           "assistant",
-          "Se perdió la conexión con el asistente. 🤯🤕🫯  ."
+          "Se perdió la conexión con el asistente. Intenta otra vez o contáctanos por WhatsApp."
         );
 
         appendButtonsRow([
